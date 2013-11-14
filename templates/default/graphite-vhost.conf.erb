@@ -29,6 +29,15 @@ NameVirtualHost *:<%= node['graphite']['listen_port'] %>
         SSLCertificateKeyFile <%= node['graphite']['ssl']['certificate_key_file'] %>
         <%- end %>
 
+        <%- if node['graphite']['apache']['mod_wsgi'] %>
+        WSGIDaemonProcess graphite processes=<%= node['graphite']['apache']['mod_wsgi']['procs'] %> threads=<%= node['graphite']['apache']['mod_wsgi']['threads'] %> display-name='%{GROUP}' inactivity-timeout=120
+        WSGIProcessGroup graphite
+        WSGIApplicationGroup %{GLOBAL}
+        WSGIImportScript <%= node['graphite']['apache']['mod_wsgi']['script'] %> process-group=graphite application-group=%{GLOBAL}
+
+        WSGIScriptAlias / <%= node['graphite']['apache']['mod_wsgi']['script'] %>
+        <%- end %>
+
         <Location "/">
                 <%- if node['graphite']['apache']['basic_auth']['enabled'] %>
                 AuthType Basic
@@ -37,13 +46,15 @@ NameVirtualHost *:<%= node['graphite']['listen_port'] %>
                 AuthUserFile <%= node['graphite']['apache']['basic_auth']['file_path'] %>
                 Require valid-user
                 <%- end %>
-
+                
+                <%- if node['graphite']['apache']['mod_wsgi'] == 'false' %>
                 SetHandler python-program
                 PythonPath "['<%= node['graphite']['doc_root'] %>', '<%= node['graphite']['base_dir'] %>/lib'] + sys.path"
                 PythonHandler django.core.handlers.modpython
                 SetEnv DJANGO_SETTINGS_MODULE graphite.settings
                 PythonDebug Off
                 PythonAutoReload Off
+                <%- end %>
         </Location>
 
         <Location "/content/">

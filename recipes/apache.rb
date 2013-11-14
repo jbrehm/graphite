@@ -1,4 +1,13 @@
-include_recipe "apache2::mod_python"
+if node['graphite']['apache']['mod_wsgi']
+  include_recipe "apache2::mod_wsgi"
+
+  template "#{node['graphite']['base_dir']}/conf/graphite.wsgi" do
+    mode 0755
+  end
+else
+  include_recipe "apache2::mod_python"
+end
+
 include_recipe "apache2::mod_headers"
 if node['graphite']['ssl']['enabled']
   include_recipe "apache2::mod_ssl"
@@ -10,7 +19,10 @@ execute "create apache basic_auth file for graphite" do
 end
 
 template "#{node['apache']['dir']}/sites-available/graphite" do
-  source "graphite-vhost.conf.erb"
+  unless node['graphite']['apache']['vhost']['cookbook'].nil?
+    cookbook node['graphite']['apache']['vhost']['cookbook']
+  end
+  source node['graphite']['apache']['vhost']['source']
   notifies :reload, "service[apache2]"
 end
 
