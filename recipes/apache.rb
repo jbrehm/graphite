@@ -1,4 +1,4 @@
-if node['graphite']['apache']['mod_wsgi']
+if node['graphite']['apache']['mod_wsgi']['enabled']
   include_recipe "apache2::mod_wsgi"
 
   template "#{node['graphite']['base_dir']}/conf/graphite.wsgi" do
