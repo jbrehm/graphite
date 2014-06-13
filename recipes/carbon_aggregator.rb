@@ -19,35 +19,13 @@
 
 service_type = node['graphite']['carbon']['service_type']
 
-case service_type
-when 'runit'
-  carbon_aggregator_service_resource = 'runit_service[carbon-aggregator]'
-else
-  carbon_aggregator_service_resource = 'service[carbon-aggregator]'
-end
-
-if node['graphite']['storage_aggregation'].is_a?(Array) and node['graphite']['storage_aggregation'].length > 0
-  template "#{node['graphite']['base_dir']}/conf/storage-aggregation.conf" do
-    source 'storage.conf.erb'
-    owner node['graphite']['user_account']
-    group node['graphite']['group_account']
-    variables( :storage_config => node['graphite']['storage_aggregation'] )
-    notifies :restart, carbon_aggregator_service_resource
-  end
-else
-  file "#{node['graphite']['base_dir']}/conf/storage-aggregation.conf" do
-    action :delete
-    notifies :restart, carbon_aggregator_service_resource
-  end
-end
-
 # aggregation-rules.conf file is automatically reloaded by the carbon-aggregator process.
 # There is no need to restart the application.
-if node['graphite']['aggregation_rules'].is_a?(Array) and node['graphite']['aggregation_rules'].length > 0
+if node['graphite']['aggregation_rules'].is_a?(Array) && node['graphite']['aggregation_rules'].length > 0
   template "#{node['graphite']['base_dir']}/conf/aggregation-rules.conf" do
     owner node['graphite']['user_account']
     group node['graphite']['group_account']
-    variables( :aggregation_rules => node['graphite']['aggregation_rules'] )
+    variables(:aggregation_rules => node['graphite']['aggregation_rules'])
   end
 else
   file "#{node['graphite']['base_dir']}/conf/aggregation-rules.conf" do
@@ -56,4 +34,3 @@ else
 end
 
 include_recipe "#{cookbook_name}::#{recipe_name}_#{service_type}"
-

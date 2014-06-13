@@ -17,19 +17,20 @@
 # limitations under the License.
 #
 
-
-template "/etc/init/carbon-cache.conf" do
-  source "carbon.upstart.erb"
+template '/etc/init/carbon-cache.conf' do
+  source 'carbon.upstart.erb'
   variables(
-    :name    => 'cache',
-    :dir     => node['graphite']['base_dir'],
-    :user    => node['apache']['user']
+    :name       => 'cache',
+    :dir        => node['graphite']['base_dir'],
+    :user       => node['graphite']['user_account'],
+    :instances  => node['graphite']['carbon']['caches']
   )
   mode 00644
 end
 
-service "carbon-cache" do
+service 'carbon-cache' do
   provider Chef::Provider::Service::Upstart
   supports :restart => true, :status => true
   action [:enable, :start]
+  subscribes :restart, "template[#{node['graphite']['base_dir']}/conf/carbon.conf]"
 end

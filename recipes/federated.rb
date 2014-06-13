@@ -24,45 +24,39 @@
 # http://rcrowley.org/articles/federated-graphite.html
 #
 
-node.default['graphite']['carbon']['line_receiver_port'] = 2013
-node.default['graphite']['carbon']['udp_receiver_port'] = 2013
-node.default['graphite']['carbon']['pickle_receiver_port'] = 2014
-
-node.default['graphite']['carbon']['relay']['line_receiver_port'] = 2003
-node.default['graphite']['carbon']['relay']['udp_receiver_port'] = 2003
-node.default['graphite']['carbon']['relay']['pickle_receiver_port'] = 2004
-node.default['graphite']['carbon']['relay']['relay_method'] = "consistent-hashing"
-
 int_instances = []
 ext_instances = []
 
 if Chef::Config[:solo]
-  node.default['graphite']['carbon']['relay']['destinations'] = [
-    "127.0.0.1:#{node['graphite']['carbon']['pickle_receiver_port']}:a"
-  ]
+  destinations = []
+  node['graphite']['carbon']['caches'].each do |instance|
+    destinations << "127.0.0.1:#{instance.last['pickle_receiver_port']}:#{instance.first}"
+  end
+  node.default['graphite']['carbon']['relay']['destinations'] = destinations
 else
   if node['graphite']['chef_role']
-    graphite_results = search(:node, "roles:#{node['graphite']['chef_role']} AND chef_environment:#{node.chef_environment}")
+    graphite_results = search(:node, "roles:#{node['graphite']['chef_role']} AND chef_environment:#{node.chef_environment}").sort
     if graphite_results
       destinations = []
+      carbonlink_hosts = []
       cluster_servers = []
 
       graphite_results.each do |result|
-        destinations << "#{result['fqdn']}:#{result['graphite']['carbon']['pickle_receiver_port']}:a"
-        if result['fqdn'] != node['fqdn']
-          cluster_servers << "#{result['fqdn']}:#{node['graphite']['listen_port']}"
-          ext_instances << "#{result['fqdn']}:a"
-        else
-          int_instances << "#{result['fqdn']}:a"
+        result['graphite']['carbon']['caches'].each do |instance|
+          destinations << "#{result['fqdn']}:#{instance.last['pickle_receiver_port']}:#{instance.first}"
+          if result['fqdn'] != node['fqdn']
+            cluster_servers << "#{result['fqdn']}:#{node['graphite']['listen_port']}" unless cluster_servers.include?("#{result['fqdn']}:#{node['graphite']['listen_port']}")
+            ext_instances << "#{result['fqdn']}:#{instance}"
+          else
+            carbonlink_hosts << "#{result['fqdn']}:#{instance.last['pickle_receiver_port']}:#{instance.first}"
+            int_instances << "#{result['fqdn']}:#{instance}"
+          end
         end
       end
 
       node.default['graphite']['carbon']['relay']['destinations'] = destinations
-      node.default['graphite']['graphite_web']['cluster_servers'] = cluster_servers
-
-      node.default['graphite']['graphite_web']['carbonlink_hosts'] = [
-        "#{result['fqdn']}:#{node['graphite']['carbon']['cache_query_port']}:a",
-      ]
+      node.default['graphite']['web']['carbonlink_hosts'] = carbonlink_hosts
+      node.default['graphite']['web']['cluster_servers'] = cluster_servers
     end
   end
 end
@@ -71,13 +65,12 @@ node.default['graphite']['relay_rules'] = [
   {
     'name' => 'default_rule',
     'default' => true,
-    'destinations' => node['graphite']['carbon']['relay']['destinations'],
+    'destinations' => node['graphite']['carbon']['relay']['destinations']
   }
 ]
 
-include_recipe "graphite::default"
-include_recipe "graphite::carbon_relay"
-
+include_recipe 'graphite::default'
+include_recipe 'graphite::carbon_relay'
 
 template "#{node['graphite']['base_dir']}/bin/whisper-clean-this-node.sh" do
   source 'whisper-clean-this-node.sh.erb'
@@ -88,6 +81,5 @@ template "#{node['graphite']['base_dir']}/bin/whisper-clean-this-node.sh" do
             :whisper_clean_py => "#{node['graphite']['base_dir']}/bin/whisper-clean.py",
             :int_instances => int_instances,
             :ext_instances => ext_instances)
-  only_if { int_instances.length > 0 and ext_instances.length > 0 }
+  only_if { int_instances.length > 0 && ext_instances.length > 0 }
 end
-

@@ -8,12 +8,10 @@ else
   include_recipe "apache2::mod_python"
 end
 
-include_recipe "apache2::mod_headers"
-if node['graphite']['ssl']['enabled']
-  include_recipe "apache2::mod_ssl"
-end
+include_recipe 'apache2::mod_headers'
+include_recipe 'apache2::mod_ssl' if node['graphite']['ssl']['enabled']
 
-execute "create apache basic_auth file for graphite" do
+execute 'create apache basic_auth file for graphite' do
   command "htpasswd -bc #{node['graphite']['apache']['basic_auth']['file_path']} #{node['graphite']['apache']['basic_auth']['user']} #{node['graphite']['apache']['basic_auth']['pass']}"
   only_if { node['graphite']['apache']['basic_auth']['enabled'] }
 end
@@ -26,8 +24,8 @@ template "#{node['apache']['dir']}/sites-available/graphite" do
   notifies :reload, "service[apache2]"
 end
 
-apache_site "graphite"
+apache_site 'graphite'
 
-apache_site "000-default" do
+apache_site '000-default' do
   enable false
 end

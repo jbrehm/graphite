@@ -20,13 +20,11 @@
 basedir = node['graphite']['base_dir']
 docroot = node['graphite']['doc_root']
 storagedir = node['graphite']['storage_dir']
-version = node['graphite']['version']
-pyver = node['languages']['python']['version'][0..-3]
 
 if node['graphite']['web_server'] == 'apache'
   graphite_web_service_resource = 'service[apache2]'
 else
-  graphite_web_service_resource = 'runit_service[graphite-web]'
+  graphite_web_service_resource = "#{'runit_' if node['graphite']['uwsgi']['service_type'] == 'runit'}service[graphite-web]"
 end
 
 password = node['graphite']['password']
@@ -35,56 +33,16 @@ if node['graphite']['encrypted_data_bag']['name']
   data_bag_item = Chef::EncryptedDataBagItem.load(data_bag_name, 'graphite')
   password = data_bag_item['web_password']
 else
-  Chef::Log.warn "This recipe uses encrypted data bags for graphite password but no encrypted data bag name is specified - fallback to node attribute."
+  Chef::Log.warn 'This recipe uses encrypted data bags for graphite password but no encrypted data bag name is specified - fallback to node attribute.'
 end
 
-dep_packages = case node['platform_family']
-               when "debian"
-                 packages = %w{ python-cairo-dev python-django python-django-tagging python-rrdtool }
-
-                 # Optionally include memcached client
-                 if node['graphite']['web']['memcached_hosts'].length > 0
-                     packages += %w{python-memcache} + packages
-                 end
-
-                 packages
-               when "rhel", "fedora"
-                 packages = %w{ Django django-tagging pycairo-devel python-devel mod_wsgi python-sqlite2 python-zope-interface }
-
-                 # Include bitmap packages (optionally)
-                 if node['graphite']['graphite_web']['bitmap_support']
-                   packages += %w{bitmap bitmap-fonts}
-                 end
-
-                 # Optionally include memcached client
-                 if node['graphite']['web']['memcached_hosts'].length > 0
-                     packages += %w{python-memcached}
-                 end
-
-                 packages
-               end
-
-dep_packages.each do |pkg|
-  package pkg do
-    action :install
-  end
-end
-
-remote_file "#{Chef::Config[:file_cache_path]}/graphite-web-#{version}.tar.gz" do
-  source node['graphite']['web']['uri']
-  checksum node['graphite']['web']['checksum']
-end
-
-execute "untar graphite-web" do
-  command "tar xzof graphite-web-#{version}.tar.gz"
-  creates "#{Chef::Config[:file_cache_path]}/graphite-web-#{version}"
-  cwd Chef::Config[:file_cache_path]
-end
-
-execute "install graphite-web" do
-  command "python setup.py install --prefix=#{node['graphite']['base_dir']} --install-lib=#{node['graphite']['doc_root']}"
-  creates "#{node['graphite']['doc_root']}/graphite_web-#{version}-py#{pyver}.egg-info"
-  cwd "#{Chef::Config[:file_cache_path]}/graphite-web-#{version}"
+python_pip 'graphite_web' do
+  package_name lazy {
+    node['graphite']['package_names']['graphite_web'][node['graphite']['install_type']]
+  }
+  version lazy {
+    node['graphite']['install_type'] == 'package' ? node['graphite']['version'] : nil
+  }
 end
 
 directory "#{storagedir}/log/webapp" do
@@ -100,8 +58,19 @@ end
   end
 end
 
+execute 'config selinux context' do
+  command "chcon -R -h -t httpd_log_t #{storagedir}/log/webapp"
+  only_if 'sestatus | grep enabled'
+end
+
+directory "#{docroot}/graphite" do
+  owner node['graphite']['user_account']
+  group node['graphite']['group_account']
+  recursive true
+end
+
 template "#{docroot}/graphite/local_settings.py" do
-  source "local_settings.py.erb"
+  source 'local_settings.py.erb'
   mode 00755
   variables(:timezone => node['graphite']['timezone'],
             :debug => node['graphite']['web']['debug'],
@@ -110,21 +79,35 @@ template "#{docroot}/graphite/local_settings.py" do
             :storage_dir => node['graphite']['storage_dir'],
             :cluster_servers => node['graphite']['web']['cluster_servers'],
             :carbonlink_hosts => node['graphite']['web']['carbonlink_hosts'],
-            :memcached_hosts => node['graphite']['web']['memcached_hosts'] )
+            :memcached_hosts => node['graphite']['web']['memcached_hosts'],
+            :database => node['graphite']['web']['database'],
+            :ldap => node['graphite']['web']['ldap'],
+            :remote_user_auth => node['graphite']['web']['auth']['REMOTE_USER_AUTH'],
+            :login_url => node['graphite']['web']['auth']['LOGIN_URL'],
+            :email => node['graphite']['web']['email'])
+  notifies :reload, graphite_web_service_resource
+end
+
+template "#{basedir}/conf/graphTemplates.conf" do
+  source 'graphTemplates.conf.erb'
+  mode 00755
+  variables(
+    :graph_templates => node['graphite']['graph_templates']
+  )
   notifies :reload, graphite_web_service_resource
 end
 
 template "#{basedir}/bin/set_admin_passwd.py" do
-  source "set_admin_passwd.py.erb"
+  source 'set_admin_passwd.py.erb'
   mode 00755
 end
 
 cookbook_file "#{storagedir}/graphite.db" do
   action :create_if_missing
-  notifies :run, "execute[set admin password]"
+  notifies :run, 'execute[set admin password]'
 end
 
-execute "set admin password" do
+execute 'set admin password' do
   command "#{basedir}/bin/set_admin_passwd.py root #{password}"
   action :nothing
 end
@@ -137,7 +120,7 @@ file "#{storagedir}/graphite.db" do
 end
 
 if node['graphite']['web_server'] == 'apache'
-  include_recipe "graphite::apache"
+  include_recipe 'graphite::apache'
 else
-  include_recipe "graphite::uwsgi"
+  include_recipe 'graphite::uwsgi'
 end

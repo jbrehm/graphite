@@ -17,19 +17,20 @@
 # limitations under the License.
 #
 
-
-template "/etc/init/carbon-relay.conf" do
-  source "carbon.upstart.erb"
+template '/etc/init/carbon-relay.conf' do
+  source 'carbon.upstart.erb'
   variables(
-    :name    => 'relay',
-    :dir     => node['graphite']['base_dir'],
-    :user    => node['apache']['user']
+    :name       => 'relay',
+    :dir        => node['graphite']['base_dir'],
+    :user       => node['graphite']['user_account'],
+    :instances  => { 'a' => '' }
   )
   mode 00644
 end
 
-service "carbon-relay" do
+service 'carbon-relay' do
   provider Chef::Provider::Service::Upstart
   supports :restart => true, :status => true
   action [:enable, :start]
+  subscribes :restart, "template[#{node['graphite']['base_dir']}/conf/carbon.conf]"
 end

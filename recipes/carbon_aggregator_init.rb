@@ -17,18 +17,24 @@
 # limitations under the License.
 #
 
-template "/etc/init.d/carbon-aggregator" do
-  source "carbon.init.erb"
-  variables(
-    :name    => 'aggregator',
-    :dir     => node['graphite']['base_dir'],
-    :user    => node['apache']['user']
-  )
-  mode 00744
-  notifies :restart, "service[carbon-aggregator]"
+case node['platform_family']
+when 'debian'
+  package 'daemon'
 end
 
-service "carbon-aggregator" do
+template '/etc/init.d/carbon-aggregator' do
+  source 'carbon.init.erb'
+  variables(
+    :name       => 'aggregator',
+    :dir        => node['graphite']['base_dir'],
+    :user       => node['graphite']['user_account'],
+    :instances  => { 'a' => '' }
+  )
+  mode 00744
+  notifies :restart, 'service[carbon-aggregator]'
+end
+
+service 'carbon-aggregator' do
   action [:enable, :start]
   subscribes :restart, "template[#{node['graphite']['base_dir']}/conf/carbon.conf]"
 end

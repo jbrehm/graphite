@@ -17,12 +17,12 @@
 # limitations under the License.
 #
 
-package "python-twisted"
-package "python-simplejson"
+package 'python-twisted'
+package 'python-simplejson'
 
 if node['graphite']['carbon']['enable_amqp']
-  include_recipe "python::pip"
-  python_pip "txamqp" do
+
+  python_pip 'txamqp' do
     action :install
   end
 
@@ -32,28 +32,30 @@ if node['graphite']['carbon']['enable_amqp']
     data_bag_item = Chef::EncryptedDataBagItem.load(data_bag_name, 'graphite')
     amqp_password = data_bag_item['amqp_password']
   else
-    Chef::Log.warn "This recipe uses encrypted data bags for carbon AMQP password but no encrypted data bag name is specified - fallback to node attribute."
+    Chef::Log.warn 'This recipe uses encrypted data bags for carbon AMQP password but no encrypted data bag name is specified - fallback to node attribute.'
   end
+
 end
 
-version = node['graphite']['version']
-pyver = node['languages']['python']['version'][0..-3]
-
-remote_file "#{Chef::Config[:file_cache_path]}/carbon-#{version}.tar.gz" do
-  source node['graphite']['carbon']['uri']
-  checksum node['graphite']['carbon']['checksum']
+# sadly, have to pin Twisted to known good version
+# install before carbon so it's used
+python_pip 'Twisted' do
+  version lazy { node['graphite']['twisted_version'] }
 end
 
-execute "untar carbon" do
-  command "tar xzof carbon-#{version}.tar.gz"
-  creates "#{Chef::Config[:file_cache_path]}/carbon-#{version}"
-  cwd Chef::Config[:file_cache_path]
+python_pip 'carbon' do
+  package_name lazy {
+    node['graphite']['package_names']['carbon'][node['graphite']['install_type']]
+  }
+  version lazy {
+    node['graphite']['install_type'] == 'package' ? node['graphite']['version'] : nil
+  }
 end
 
-execute "install carbon" do
-  command "python setup.py install --prefix=#{node['graphite']['base_dir']} --install-lib=#{node['graphite']['base_dir']}/lib"
-  creates "#{node['graphite']['base_dir']}/lib/carbon-#{version}-py#{pyver}.egg-info"
-  cwd "#{Chef::Config[:file_cache_path]}/carbon-#{version}"
+directory "#{node['graphite']['base_dir']}/conf" do
+  owner node['graphite']['user_account']
+  group node['graphite']['group_account']
+  recursive true
 end
 
 template "#{node['graphite']['base_dir']}/conf/carbon.conf" do
@@ -61,8 +63,9 @@ template "#{node['graphite']['base_dir']}/conf/carbon.conf" do
   group node['graphite']['group_account']
   carbon_options = node['graphite']['carbon'].dup
   carbon_options['amqp_password'] = amqp_password unless amqp_password.nil?
-  variables( :storage_dir => node['graphite']['storage_dir'],
-             :carbon_options => carbon_options
+  variables(
+    :storage_dir => node['graphite']['storage_dir'],
+    :carbon_options => carbon_options
   )
 end
 
@@ -72,7 +75,7 @@ directory node['graphite']['storage_dir'] do
   recursive true
 end
 
-%w{ log whisper }.each do |dir|
+%w{ log whisper rrd }.each do |dir|
   directory "#{node['graphite']['storage_dir']}/#{dir}" do
     owner node['graphite']['user_account']
     group node['graphite']['group_account']
@@ -84,4 +87,3 @@ directory "#{node['graphite']['base_dir']}/lib/twisted/plugins/" do
   group node['graphite']['group_account']
   recursive true
 end
-

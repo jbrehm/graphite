@@ -3,6 +3,11 @@ Description
 
 Installs and configures Graphite http://graphite.wikidot.com/
 
+Consult the Graphite documentation for more information:
+
+- http://graphite.readthedocs.org/en/latest/
+- http://graphite.wikidot.com/
+
 Requirements
 ============
 
@@ -32,22 +37,23 @@ Attributes
 carbon-cache.py attributes
 --------------------------
 
-* `node['graphite']['storage_schemas']` - an weighted hash with retention rates for storing metrics, used to generate the *storage-schemas.conf* file ([see the example below](#storage_schemas-example))
+* `node['graphite']['storage_schemas']` - an array with retention rates for storing metrics, used to generate the *storage-schemas.conf* file ([see the example below](#storage_schemas-example))
+* `node['graphite']['storage_aggregation']` - an array with rules to configure how to aggregate data to lower-precision retentions, used to generate the *storage-aggregation.conf* file
 * `node['graphite']['carbon']['uri']` - download url for carbon
 * `node['graphite']['carbon']['checksum']` - checksum for the carbon download
-* `node['graphite']['carbon']['line_receiver_interface']` - line interface IP (defaults to 0.0.0.0)
-* `node['graphite']['carbon']['line_receiver_port']` - line interface port (defaults to 2003)
+* `node['graphite']['carbon']['caches']['a']['line_receiver_interface']` - line interface IP (defaults to 0.0.0.0)
+* `node['graphite']['carbon']['caches']['a']['line_receiver_port']` - line interface port (defaults to 2003)
+* `node['graphite']['carbon']['caches']['a']['udp_receiver_interface']` - line interface IP for UDP listener (defaults to 0.0.0.0)
+* `node['graphite']['carbon']['caches']['a']['udp_receiver_port']` - line interface port for UDP listener (defaults to 2003)
+* `node['graphite']['carbon']['caches']['a']['pickle_receiver_interface']` - pickle receiver IP (defaults to 0.0.0.0)
+* `node['graphite']['carbon']['caches']['a']['pickle_receiver_port']` - pickle receiver port (defaults to 2004)
 * `node['graphite']['carbon']['enable_udp_listener']` - set this to "True" to enable the UDP listener (defaults to "False")
-* `node['graphite']['carbon']['udp_receiver_interface']` - line interface IP for UDP listener (defaults to 0.0.0.0)
-* `node['graphite']['carbon']['udp_receiver_port']` - line interface port for UDP listener (defaults to 2003)
-* `node['graphite']['carbon']['pickle_receiver_interface']` - pickle receiver IP (defaults to 0.0.0.0)
-* `node['graphite']['carbon']['pickle_receiver_port']` - pickle receiver port (defaults to 2004)
 * `node['graphite']['carbon']['use_insecure_unpickler']` - set this to "True" to use the old-fashioned insecure unpickler (defaults to "False")
 * `node['graphite']['carbon']['cache_query_interface']` - cache query IP (defaults to 0.0.0.0)
 * `node['graphite']['carbon']['cache_query_port']` - cache query port (defaults to 7002)
 * `node['graphite']['carbon']['use_flow_control']` - set this to "False" to drop datapoints received after the cache reaches *MAX_CACHE_SIZE* (defaults to "True")
 * `node['graphite']['carbon']['max_cache_size']` - max size of the carbon cache (defaults to "inf")
-* `node['graphite']['carbon']['max_creates_per_second']` - max number of new metrics to create per second (defaults to "inf")
+* `node['graphite']['carbon']['max_creates_per_minute']` - max number of new metrics to create per minute (defaults to "inf")
 * `node['graphite']['carbon']['max_updates_per_second']` - max updates to carbon per second (defaults to "1000")
 * `node['graphite']['carbon']['log_whisper_updates']` - log updates to whisper (defaults to "False")
 * `node['graphite']['carbon']['whisper_autoflush']` - set this option to "True" if you want whisper to write synchronously (defaults to "False")
@@ -71,7 +77,6 @@ carbon-relay.py attributes
 carbon-aggregator.py attributes
 -------------------------------
 
-* `node['graphite']['storage_aggregation']` - an array with rules to configure how to aggregate data to lower-precision retentions, used to generate the *storage-aggregation.conf* file
 * `node['graphite']['aggregation_rules']` - an array with rules that allow you to add several metrics together, used to generate the *aggregation-rules.conf* file ([see the example below](#aggregation_rules-example))
 * `node['graphite']['carbon']['aggregator']['line_receiver_interface']` - line interface IP (defaults to 0.0.0.0)
 * `node['graphite']['carbon']['aggregator']['line_receiver_port']` - line interface port (defaults to 2023)
@@ -93,7 +98,7 @@ graphite-web attributes
 * `node['graphite']['web']['admin_email']` - admin contact email (defaults to "admin@org.com")
 * `node['graphite']['web']['cluster_servers']` - IP address (and optionally port) of the webapp on each remote server in the cluster
 * `node['graphite']['web']['carbonlink_hosts']` - list the IP address, cache query port and instance name of each carbon cache instance on the **local** machine
-* `node['graphite']['web_server']` - defaults to `apache`. Anything else will use uswsgi instead of apache
+* `node['graphite']['web_server']` - defaults to `apache`. Anything else will use uwsgi instead of apache
 * `node['graphite']['user_account']` - user (default `node['apache']['user']`)
 * `node['graphite']['group_account']` - group (default `node['apache']['group']`)
 * `node['graphite']['create_user']`- should the user be created, boolean (defaults to false)
@@ -101,11 +106,39 @@ graphite-web attributes
 * `node['graphite']['ssl']['cipher_suite']` - the cipher suite to use if ssl is enabled
 * `node['graphite']['ssl']['certificate_file']` - the path to the certificate file if ssl is enabled
 * `node['graphite']['ssl']['certificate_key_file']` - the path to the vertificate key file if ssl is enabled
+* `node['graphite']['ssl']['ca_certificate_file']` - the path to the intermediate CA certificate file if ssl is enabled. Leave blank if you don't have or need one.
 * `node['graphite']['apache']['basic_auth']['enabled']` - enable basic auth in the apache2 vhost to require authentication for access to web interface (defaults to false)
 * `node['graphite']['apache']['basic_auth']['file_path']` - location of htpasswd file for basic auth (defaults to node['graphite']['doc_root']/htpasswd)
 * `node['graphite']['apache']['basic_auth']['user']` - username for basic auth
 * `node['graphite']['apache']['basic_auth']['pass']` - password for basic auth
 * `node['graphite']['uwsgi_socket']` - the socket to bind uwsgi process to (only needed if using uwsgi)
+
+### database settings
+
+* `default['graphite']['web']['database']['NAME']` - the database name defaults to sqlite database in the storage folder
+* `default['graphite']['web']['database']['ENGINE']` - the django database engine that will be used. The default is sqlite. If you want to use mysql set this to `django.db.backends.mysql`
+* `default['graphite']['web']['database']['USER']` - database username leave this blank if you're using sqlite
+* `default['graphite']['web']['database']['PASSWORD']` - database password leave this blank if you're using sqlite.
+* `default['graphite']['web']['database']['HOST']` - database host leave this blank if you're using sqlite.
+* `default['graphite']['web']['database']['PORT']` - database port leave this blank if you're using sqlite.
+
+### ldap settings
+
+* `default['graphite']['web']['ldap']['SERVER']` - ldap server you want to use
+* `default['graphite']['web']['ldap']['BASE_USER']` - the base dn of the user graphite web should use
+* `default['graphite']['web']['ldap']['BASE_PASS']` - password for the base dn user
+* `default['graphite']['web']['ldap']['USER_QUERY']` - the ldap query to find the user by name. If you're using MS AD this should be `"(sAMAccountName=%s)"`
+* `default['graphite']['web']['ldap']['SEARCH_BASE']` - the search base the query should run against
+
+### email settings
+
+* `default['graphite']['web']['email']['BACKEND']` - django email backend "django.core.mail.backends.smtp.EmailBackend"
+* `default['graphite']['web']['email']['HOST']` - the smtp host. This defaults to `"localhost"`
+* `default['graphite']['web']['email']['PORT']` - the smtp port.
+* `default['graphite']['web']['email']['HOST_USER']` - the smtp user. Just use this if you need to authenticate against smtp
+* `default['graphite']['web']['email']['HOST_PASSWORD']` - the smtp password
+* `default['graphite']['web']['email']['USE_TLS']` - if you want to use tls change this to `true`
+
 
 storage_schemas example
 -----------------------
@@ -186,6 +219,29 @@ node.default['graphite']['storage_aggregation'] = [
 ]
 ```
 
+graph_templates example
+-----------------------
+
+```ruby
+node.default['graphite']['graph_templates'] = [
+  {
+    'name' => 'basic',
+    'background' => 'white',
+    'foreground' => 'black',
+    'majorLine' => 'grey',
+    'minorLine' => 'rose',
+    'lineColors' => 'blue,green,red,purple,brown,yellow,aqua,grey,magenta,pink,gold,rose'
+  },
+  {
+    'name' => 'custom',
+    'background' => 'black',
+    'foreground' => 'white',
+    'majorLine' => 'grey',
+    'minorLine' => 'rose',
+    'lineColors' => '#f29709,#41546f,#0ebadc,#a48ad5,#49c28d,#c75551'
+  },
+]
+```
 
 Data Bags
 =========
@@ -210,6 +266,8 @@ Usage
 `recipe[graphite::carbon_aggregator]` builds the aggregation_rules and storage-aggregation config files,
 and configures the `carbon-aggregator` service.
 
-`recipe[graphite::ganglia]` integrates with Ganglia. You'll want at
-least one monitor node (i.e. recipe[ganglia]) node to be running
-to use it.
+Amazon Web Services
+===================
+
+Due to old version of Chef used on Amazon Web Services to succesfully run this cookbook add [`delayed_evaluator`](http://community.opscode.com/cookbooks/delayed_evaluator) recipe
+to run list somewhere before `graphite` recipe.
