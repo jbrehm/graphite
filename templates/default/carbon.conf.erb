@@ -263,6 +263,10 @@ LINE_RECEIVER_PORT = <%= @carbon_options[:aggregator][:line_receiver_port] %>
 PICKLE_RECEIVER_INTERFACE = <%= @carbon_options[:aggregator][:pickle_receiver_interface] %>
 PICKLE_RECEIVER_PORT = <%= @carbon_options[:aggregator][:pickle_receiver_port] %>
 
+ENABLE_UDP_LISTENER = <%= @carbon_options[:aggregator][:enable_udp_listener] %>
+UDP_RECEIVER_INTERFACE = <%= @carbon_options[:aggregator][:udp_receiver_interface] %>
+UDP_RECEIVER_PORT = <%= @carbon_options[:aggregator][:udp_receiver_port] %>
+
 # This is a list of carbon daemons we will send any relayed or
 # generated metrics to. The default provided would send to a single
 # carbon-cache instance on the default port. However if you
