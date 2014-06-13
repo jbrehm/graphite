@@ -24,6 +24,7 @@ if node['graphite']['storage_schemas'].is_a?(Hash) && node['graphite']['storage_
     source 'storage.conf.erb'
     owner node['graphite']['user_account']
     group node['graphite']['group_account']
+    keys = node['graphite']['storage_schemas'].keys.collect{|x| x.to_i}.sort.uniq
     variables(:storage_config => keys.collect{|key| node['graphite']['storage_schemas'][key.to_s]})
     only_if { node['graphite']['storage_schemas'].is_a?(Hash) }
     caches.each do |service|
